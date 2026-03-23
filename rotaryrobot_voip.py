@@ -12,6 +12,7 @@ from openai import OpenAI
 from faster_whisper import WhisperModel
 from pyVoIP.VoIP import VoIPPhone, CallState, InvalidStateError
 
+# Ensure the data directory exists
 os.makedirs("data", exist_ok=True)
 
 # --- LOCAL AI ENGINE ---
@@ -80,6 +81,7 @@ def is_silent(chunk, threshold=1.0):
     return deviation < threshold
 
 def play_audio(call, file_path):
+    """Kept specifically to play the pre-recorded greeting.wav file."""
     try:
         with wave.open(file_path, 'rb') as f:
             frames = f.getnframes()
@@ -238,16 +240,40 @@ def query_and_stream_response(messages, call):
 
 def generate_and_speak(call, text_to_speak):
     robot_print(f"🤖 ROBOT SAYS: \"{text_to_speak}\"")
-    temp_wav = "temp_response.wav"
-    final_wav = "response_u8.wav"
     speed = get_config("voice_speed", 1.0)
     
     try:
-        subprocess.run(["text2wave", "-eval", f"(Parameter.set 'Duration_Stretch {speed})", "-o", temp_wav], input=text_to_speak, text=True, check=True)
-        subprocess.run(["ffmpeg", "-y", "-i", temp_wav, "-af", "acompressor=ratio=4,highpass=f=300,lowpass=f=3400,volume=1.6", "-ar", "8000", "-ac", "1", "-c:a", "pcm_u8", final_wav], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        play_audio(call, final_wav)
+        # 1. Start text2wave, telling it to read from Python and output to RAM (-)
+        t2w_cmd = ["text2wave", "-eval", f"(Parameter.set 'Duration_Stretch {speed})", "-o", "-"]
+        t2w_process = subprocess.Popen(t2w_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        
+        # 2. Start FFmpeg, telling it to read from text2wave's RAM output and format it for the phone line
+        ffmpeg_cmd = [
+            "ffmpeg", "-y", "-i", "pipe:0",
+            "-af", "acompressor=ratio=4,highpass=f=300,lowpass=f=3400,volume=1.6", 
+            "-ar", "8000", "-ac", "1", "-f", "u8", "pipe:1"
+        ]
+        ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdin=t2w_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        
+        # 3. Inject the text into the pipeline and grab the resulting audio bytes
+        t2w_process.stdin.write(text_to_speak.encode('utf-8'))
+        t2w_process.stdin.close() 
+        raw_audio_bytes, _ = ffmpeg_process.communicate()
+        
+        # 4. Stream the bytes directly into the FreePBX telephone line
+        if raw_audio_bytes:
+            robot_print(f"[Rotary Robot] Streaming RAM audio directly to handset...")
+            call.write_audio(raw_audio_bytes)
+            
+            # Keep the thread alive while the audio plays (8000 samples per sec, 1 byte per sample)
+            play_time_seconds = len(raw_audio_bytes) / 8000.0
+            stop_time = time.time() + play_time_seconds
+            
+            while time.time() <= stop_time and call.state == CallState.ANSWERED:
+                time.sleep(0.05)
+                
     except Exception as e:
-        robot_print(f"[AI Brain] TTS Error: {e}")
+        robot_print(f"[AI Brain] In-Memory TTS Error: {e}")
 
 # --- MAIN CALL LOGIC ---
 def answer_call(call):
