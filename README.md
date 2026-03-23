@@ -8,11 +8,11 @@ Have you ever wanted to pick up a heavy, mechanical 1970s rotary phone, dial an 
 Rotary Robot AI acts as a SIP client on your local network. When you dial its extension, it answers the phone, records your voice, locally transcribes it using an offline neural engine, streams a response from OpenAI, and speaks it back to you over the telephone line in real-time.
 
 ## ✨ Key Features
-* **Zero-Latency Streaming:** Uses a custom "staccato" prompt and punctuation triggers to stream text-to-speech audio *while* the AI is still thinking.
-* **100% Local STT (Ears):** Uses the highly optimized `faster-whisper` engine running entirely on your local CPU for total privacy and sub-second transcription. No cloud audio uploading required.
-* **Vintage Hardware Support:** Fully compatible with mechanical pulse-dialing when paired with the right ATA hardware.
-* **Zero-Touch Deployment:** Fully containerized with a secure, web-based initialization screen. No need to manually edit JSON configuration files. 
-* **Secure Web Dashboard:** A responsive, Flask-based UI to manage AI personality, adjust voice pitch/speed, view live terminal logs, and review persistent call history.
+* **100% In-Memory Pipeline:** Audio from the handset is piped directly into RAM as a raw byte array for `faster-whisper` to decode. Zero hard drive I/O bottlenecks.
+* **Fluid Background Thinking:** While the LLM generates its response, the robot instantly plays a randomized filler phrase (e.g., *"Accessing mainframe..."*). By the time the phrase finishes, the LLM has generated the complete response, resulting in a perfectly fluid, unbroken paragraph of speech.
+* **"Smart Flush" Acoustics:** The system actively purges stale SIP network audio to prevent "time-traveling" echoes, ensuring the robot hears you instantly the moment it finishes speaking.
+* **Typo-Proof Killswitches:** Gracefully handles analog disconnects and gracefully signs off when you say "Goodbye" or "Hang up."
+* **Vintage Voice:** Uses the classic `Festival` TTS engine to keep the robot sounding like a true retro machine, rather than a modern podcaster.
 
 ## 🛠️ Hardware & Network Requirements
 1. **A Vintage Telephone:** Any standard analog phone (rotary or touch-tone).
