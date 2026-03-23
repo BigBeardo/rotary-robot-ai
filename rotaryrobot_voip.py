@@ -6,6 +6,10 @@ import json
 import threading
 import queue
 import os
+import re
+import random
+import concurrent.futures
+import numpy as np
 import speech_recognition as sr
 from datetime import datetime
 from openai import OpenAI
@@ -76,37 +80,25 @@ def get_current_weather():
 def is_silent(chunk, threshold=1.0): 
     if not chunk: return True
     deviation = sum(abs(b - 128) for b in chunk) / len(chunk)
-    bar_length = min(int(deviation), 40)
-    if deviation > 0.1: robot_print(f"[MIC LEVEL] {deviation:5.1f} |{'█' * bar_length}")
+    
+    if deviation >= threshold:
+        bar_length = min(int(deviation), 40)
+        robot_print(f"[MIC LEVEL] {deviation:5.1f} |{'█' * bar_length}")
+        
     return deviation < threshold
 
 def play_audio(call, file_path):
-    """Kept specifically to play the pre-recorded greeting.wav file."""
     try:
         with wave.open(file_path, 'rb') as f:
             frames = f.getnframes()
             audio_data = f.readframes(frames)
         robot_print(f"[Rotary Robot] Transmitting {file_path} to handset...")
         call.write_audio(audio_data)
-        stop_time = time.time() + (frames / 8000.0)
-        while time.time() <= stop_time and call.state == CallState.ANSWERED:
-            time.sleep(0.1)
     except Exception as e:
         robot_print(f"[Rotary Robot] Failed to play audio: {e}")
 
-def flush_audio_buffer(call):
-    cleared_chunks = 0
-    while call.state == CallState.ANSWERED:
-        start_time = time.time()
-        try:
-            chunk = call.read_audio(160)
-            cleared_chunks += 1
-            if time.time() - start_time > 0.01: break
-        except Exception: break
-    if cleared_chunks > 1: robot_print(f"[DEBUG] Flushed {cleared_chunks} stale packets.")
-
-def record_audio_dynamic(call, raw_file="incoming_raw.wav", clean_file="incoming_ready.wav", silence_timeout=1.0, max_duration=15):
-    robot_print("[Rotary Robot] Listening... (MULTI-THREADED MODE)")
+def record_audio_dynamic(call, silence_timeout=0.8, max_duration=15):
+    robot_print("[Rotary Robot] Listening... (MULTI-THREADED RAM MODE)")
     audio_queue = queue.Queue()
     is_recording = True
     
@@ -119,47 +111,71 @@ def record_audio_dynamic(call, raw_file="incoming_raw.wav", clean_file="incoming
                 
     threading.Thread(target=audio_reader, daemon=True).start()
     
+    accumulated_chunks = []
+    start_time = time.time()
+    last_speech_time = time.time()
+    has_spoken = False
+    
     try:
-        with wave.open(raw_file, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(1)       
-            wf.setframerate(8000)    
-            
-            start_time = time.time()
-            last_speech_time = time.time()
-            has_spoken = False
-            
-            while call.state == CallState.ANSWERED:
-                if time.time() - start_time > max_duration:
-                    robot_print("[Rotary Robot] Maximum 15s recording time reached.")
+        while call.state == CallState.ANSWERED:
+            if time.time() - start_time > max_duration:
+                robot_print("[Rotary Robot] Maximum 15s recording time reached.")
+                break
+            if has_spoken:
+                if time.time() - last_speech_time > silence_timeout:
+                    robot_print("[Rotary Robot] End of speech detected.")
                     break
-                if has_spoken:
-                    if time.time() - last_speech_time > silence_timeout:
-                        robot_print("[Rotary Robot] End of speech detected.")
-                        break
-                else:
-                    if time.time() - start_time > 7.0: 
-                        robot_print("[Rotary Robot] No initial speech detected.")
-                        break
-                        
-                try:
-                    chunk = audio_queue.get(timeout=0.05)
-                    wf.writeframes(chunk)
-                    if not is_silent(chunk):
+            else:
+                if time.time() - start_time > 7.0: 
+                    robot_print("[Rotary Robot] No initial speech detected. Timing out.")
+                    break
+                    
+            try:
+                chunk = audio_queue.get(timeout=0.01)
+                is_sil = is_silent(chunk)
+                
+                if not has_spoken:
+                    if is_sil:
+                        continue 
+                    else:
                         has_spoken = True
                         last_speech_time = time.time()
-                except queue.Empty: pass
+                        accumulated_chunks.append(chunk)
+                else:
+                    accumulated_chunks.append(chunk)
+                    if not is_sil:
+                        last_speech_time = time.time()
+            except queue.Empty: pass
     finally:
         is_recording = False 
         
-    subprocess.run(["ffmpeg", "-y", "-i", raw_file, "-af", "volume=4.0", "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", clean_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return clean_file if has_spoken else None
+    if not has_spoken:
+        return None
+
+    raw_bytes = b"".join(accumulated_chunks)
+    
+    try:
+        ffmpeg_cmd = [
+            "ffmpeg", "-y", 
+            "-f", "u8", "-ar", "8000", "-ac", "1", "-i", "pipe:0",
+            "-af", "volume=4.0", 
+            "-ar", "16000", "-ac", "1", "-f", "s16le", "pipe:1"
+        ]
+        process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        out_bytes, _ = process.communicate(input=raw_bytes)
+        
+        audio_np = np.frombuffer(out_bytes, np.int16).astype(np.float32) / 32768.0
+        return audio_np
+        
+    except Exception as e:
+        robot_print(f"[Rotary Robot] RAM Transcoding Error: {e}")
+        return None
 
 # --- AI BRAIN ---
-def transcribe_audio(file_path):
-    robot_print("[AI Brain] Decoding speech locally...")
+def transcribe_audio(audio_data):
+    robot_print("[AI Brain] Decoding speech from RAM...")
     try:
-        segments, info = whisper_model.transcribe(file_path, beam_size=5)
+        segments, info = whisper_model.transcribe(audio_data, beam_size=5)
         text = "".join([segment.text for segment in segments]).strip()
         if text:
             robot_print(f"🗣️  USER SAID: \"{text}\"")
@@ -184,7 +200,7 @@ def query_gpt4o(messages, call=None):
         return "Simulator connection error.", messages
 
 def query_and_stream_response(messages, call):
-    robot_print(f"[AI Brain] Consulting GPT (Streaming)...")
+    robot_print(f"[AI Brain] Consulting GPT (Fluid Background Mode)...")
     openai_key = get_config("openai_api_key")
     if not openai_key:
         error_msg = "Please configure my API keys in the dashboard."
@@ -194,43 +210,43 @@ def query_and_stream_response(messages, call):
     client = OpenAI(api_key=openai_key)
     gpt_model = get_config("gpt_model", "gpt-4o")
     max_tokens = int(get_config("max_tokens", 150))
-    
-    is_thinking = True
-    def keep_alive_ping():
-        silence_packet = bytes([128] * 160)
-        while is_thinking and call and call.state == CallState.ANSWERED:
-            try:
-                call.write_audio(silence_packet)
-                time.sleep(0.02)
-            except Exception: break
-                
-    threading.Thread(target=keep_alive_ping, daemon=True).start()
-    
-    try:
+
+    def fetch_gpt():
         start_t1 = time.time()
-        response = client.chat.completions.create(model=gpt_model, messages=messages, max_tokens=max_tokens, temperature=0.7, stream=True)
-        
-        sentence_buffer = ""
-        full_response = ""
-        first_sentence = True
-        
-        for chunk in response:
-            content = chunk.choices[0].delta.content
-            if content:
-                sentence_buffer += content
-                full_response += content
-                is_thinking = False 
-                
-                if any(punct in content for punct in ['.', '!', '?', ',']):
-                    text_to_speak = sentence_buffer.strip()
-                    sentence_buffer = ""
-                    if first_sentence:
-                        robot_print(f"[DEBUG] Time to first audio chunk: {time.time() - start_t1:.2f} seconds")
-                        first_sentence = False
-                    generate_and_speak(call, text_to_speak)
+        response = client.chat.completions.create(
+            model=gpt_model, 
+            messages=messages, 
+            max_tokens=max_tokens, 
+            temperature=0.7
+        )
+        robot_print(f"[DEBUG] GPT Generation time: {time.time() - start_t1:.2f} seconds")
+        return response.choices[0].message.content.strip()
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(fetch_gpt)
+
+            fillers = ["Processing.", "Accessing mainframe.", "Working.", "Query received.", "Calculating."]
+            generate_and_speak(call, random.choice(fillers))
+
+            is_thinking = True
+            def keep_alive_ping():
+                silence_packet = bytes([128] * 160)
+                while is_thinking and call and call.state == CallState.ANSWERED:
+                    try:
+                        call.write_audio(silence_packet)
+                        time.sleep(0.02)
+                    except Exception: break
                     
-        if sentence_buffer.strip(): generate_and_speak(call, sentence_buffer.strip())
-        return full_response, messages
+            threading.Thread(target=keep_alive_ping, daemon=True).start()
+
+            full_response = future.result(timeout=15)
+            is_thinking = False 
+
+            if full_response:
+                generate_and_speak(call, full_response)
+                
+            return full_response, messages
 
     except Exception as e:
         is_thinking = False
@@ -238,16 +254,18 @@ def query_and_stream_response(messages, call):
         generate_and_speak(call, error_msg)
         return error_msg, messages
 
-def generate_and_speak(call, text_to_speak):
-    robot_print(f"🤖 ROBOT SAYS: \"{text_to_speak}\"")
+def generate_and_speak(call, text_to_speak, wait=False):
+    clean_text = re.sub(r'[^\x00-\x7F]+', '', text_to_speak).strip()
+    if not clean_text:
+        return
+        
+    robot_print(f"🤖 ROBOT SAYS: \"{clean_text}\"")
     speed = get_config("voice_speed", 1.0)
     
     try:
-        # 1. Start text2wave, telling it to read from Python and output to RAM (-)
         t2w_cmd = ["text2wave", "-eval", f"(Parameter.set 'Duration_Stretch {speed})", "-o", "-"]
         t2w_process = subprocess.Popen(t2w_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         
-        # 2. Start FFmpeg, telling it to read from text2wave's RAM output and format it for the phone line
         ffmpeg_cmd = [
             "ffmpeg", "-y", "-i", "pipe:0",
             "-af", "acompressor=ratio=4,highpass=f=300,lowpass=f=3400,volume=1.6", 
@@ -255,22 +273,25 @@ def generate_and_speak(call, text_to_speak):
         ]
         ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdin=t2w_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         
-        # 3. Inject the text into the pipeline and grab the resulting audio bytes
-        t2w_process.stdin.write(text_to_speak.encode('utf-8'))
+        t2w_process.stdin.write(clean_text.encode('utf-8'))
         t2w_process.stdin.close() 
+        
         raw_audio_bytes, _ = ffmpeg_process.communicate()
         
-        # 4. Stream the bytes directly into the FreePBX telephone line
+        t2w_process.stdout.close()
+        t2w_process.wait()
+        ffmpeg_process.wait()
+        
         if raw_audio_bytes:
             robot_print(f"[Rotary Robot] Streaming RAM audio directly to handset...")
             call.write_audio(raw_audio_bytes)
             
-            # Keep the thread alive while the audio plays (8000 samples per sec, 1 byte per sample)
-            play_time_seconds = len(raw_audio_bytes) / 8000.0
-            stop_time = time.time() + play_time_seconds
-            
-            while time.time() <= stop_time and call.state == CallState.ANSWERED:
-                time.sleep(0.05)
+            if wait:
+                play_time_seconds = len(raw_audio_bytes) / 8000.0
+                stop_time = time.time() + play_time_seconds
+                
+                while time.time() <= stop_time and call.state == CallState.ANSWERED:
+                    time.sleep(0.01) 
                 
     except Exception as e:
         robot_print(f"[AI Brain] In-Memory TTS Error: {e}")
@@ -284,43 +305,45 @@ def answer_call(call):
         robot_print(f"\n[=========== INCOMING CALL: {caller_id} ===========]")
         call.answer()
         robot_print("[Rotary Robot] Call answered.")
-        
+
         system_prompt = get_config("system_prompt", "You are a helpful AI.")
         current_time_str = datetime.now().strftime("%I:%M %p on %A, %B %d, %Y")
         local_weather_str = get_current_weather()
-        
+
         full_system_identity = f"{system_prompt} Current Local Time: {current_time_str}. Current Local Weather: {local_weather_str}."
         conversation_history = [{"role": "system", "content": full_system_identity}]
-        
+
         play_audio(call, "greeting_u8.wav")
         empty_responses = 0
-        
+
         while call.state == CallState.ANSWERED:
-            flush_audio_buffer(call)
-            clean_audio_file = record_audio_dynamic(call, silence_timeout=0.4)
-            
-            if clean_audio_file:
-                user_text = transcribe_audio(clean_audio_file)
+            audio_data = record_audio_dynamic(call, silence_timeout=0.8) 
+
+            if audio_data is not None:
+                user_text = transcribe_audio(audio_data)
                 if user_text:
                     empty_responses = 0
-                    if "goodbye" in user_text.lower() or "hang up" in user_text.lower():
-                        generate_and_speak(call, "Goodbye. Disconnecting the analog bridge.")
+                    
+                    clean_text = user_text.lower()
+                    if "goodbye" in clean_text or "good bye" in clean_text or "hang up" in clean_text:
+                        generate_and_speak(call, "Goodbye. Disconnecting the analog bridge.", wait=True)
                         break
+                        
                     conversation_history.append({"role": "user", "content": user_text})
                     ai_response, conversation_history = query_and_stream_response(conversation_history, call)
                     conversation_history.append({"role": "assistant", "content": ai_response})
                 else: empty_responses += 1
             else: empty_responses += 1
-                
+
             if empty_responses >= 2:
-                generate_and_speak(call, "I am not detecting any input. Ending transmission. Goodbye.")
+                generate_and_speak(call, "I am not detecting any input. Ending transmission. Goodbye.", wait=True)
                 break
-                
+
         robot_print("[Rotary Robot] Interaction complete. Hanging up.")
         call.hangup()
         robot_print("[================================================]\n")
-        
-    except InvalidStateError: robot_print("[Rotary Robot] Error: The caller hung up early.")
+
+    except InvalidStateError: robot_print("[Rotary Robot] Line disconnected by caller.")
     except Exception as e: robot_print(f"[Rotary Robot] Unexpected error: {e}")
     finally:
         call_duration = round(time.time() - call_start_time, 1)
