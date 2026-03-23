@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  rotaryrobot:
+    build: .
+    container_name: rotaryrobot
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      # Maps a single persistent data directory. 100% idiot-proof.
+      - ./data:/app/data
