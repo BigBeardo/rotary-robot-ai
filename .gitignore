@@ -1,0 +1,5 @@
+data/
+*.wav
+!greeting_u8.wav
+__pycache__/
+venv/
