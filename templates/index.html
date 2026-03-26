@@ -6,9 +6,9 @@
     <title>Rotary Robot AI Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-900 text-gray-200 p-4 md:p-8 font-sans h-screen flex flex-col overflow-hidden">
+<body class="bg-gray-900 text-gray-200 p-4 md:p-8 font-sans min-h-screen flex flex-col lg:h-screen lg:overflow-hidden">
 
-    <div class="max-w-7xl mx-auto w-full flex-grow flex flex-col h-full">
+    <div class="max-w-7xl mx-auto w-full flex-grow flex flex-col lg:h-full">
         <header class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center shrink-0">
             <div>
                 <h1 class="text-3xl font-bold text-white">Rotary Robot <span class="text-blue-500">Dashboard</span></h1>
@@ -23,12 +23,12 @@
             </div>
         </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow overflow-hidden pb-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow lg:overflow-hidden pb-4">
             
-            <div class="space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+            <div class="space-y-6 lg:overflow-y-auto pr-2 custom-scrollbar">
                 
                 <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
-                    <h2 class="text-xl font-bold text-white mb-4">System Personality</h2>
+                    <h2 class="text-xl font-bold text-white mb-4">System Personality (Global)</h2>
                     
                     <label class="block text-sm text-gray-400 mb-2">AI Brain Engine</label>
                     <select id="gptModel" class="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 text-white mb-4">
@@ -39,10 +39,24 @@
                     <label class="block text-sm text-gray-400 mb-2">Max Response Length (Tokens) <span id="tokenVal" class="text-blue-400 float-right">150</span></label>
                     <input type="range" id="maxTokens" min="20" max="500" step="10" value="150" class="w-full cursor-pointer mb-4" oninput="document.getElementById('tokenVal').innerText = this.value">
 
-                    <label class="block text-sm text-gray-400 mb-2">System Prompt</label>
-                    <textarea id="systemPrompt" rows="5" class="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 text-gray-300" placeholder="You are a helpful AI..."></textarea>
+                    <label class="block text-sm text-gray-400 mb-2">Default System Prompt</label>
+                    <textarea id="systemPrompt" rows="3" class="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 text-gray-300 mb-4" placeholder="You are a helpful AI..."></textarea>
                     
+                    <label class="block text-sm text-gray-400 mb-2">Default Voice Greeting</label>
+                    <input type="text" id="defaultGreeting" class="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 text-white mb-2" placeholder="Greetings. The analog bridge is connected.">
+
                     <button onclick="saveConfig()" class="mt-4 w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-xl transition duration-200">Save Configuration</button>
+                </div>
+
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 border-l-4 border-l-purple-500">
+                    <h2 class="text-xl font-bold text-white mb-2">Caller ID Profiles</h2>
+                    <p class="text-xs text-gray-400 mb-4">Assign custom greetings, TVs, and personal Address Books based on who is calling.</p>
+                    
+                    <div id="callerOverridesContainer" class="space-y-4 mb-4">
+                        </div>
+                    
+                    <button onclick="addCallerCard()" class="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-200 font-bold py-2 px-4 rounded-xl transition duration-200">+ Add Caller Profile</button>
+                    <button onclick="saveConfig()" class="mt-3 w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-xl transition duration-200">Save Profiles</button>
                 </div>
 
                 <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 border-t-4 border-t-yellow-500">
@@ -80,6 +94,21 @@
                     <button onclick="saveConfig()" class="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-xl transition duration-200">Securely Save Credentials</button>
                 </div>
 
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 border-t-4 border-t-orange-500">
+                    <h2 class="text-xl font-bold text-white mb-4">Plex Integration</h2>
+                    
+                    <label class="block text-sm text-gray-400 mb-1">Local Plex IP</label>
+                    <input type="text" id="plexIp" placeholder="e.g., 192.168.50.211" class="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-orange-500 text-white mb-3">
+
+                    <label class="block text-sm text-gray-400 mb-1">Plex Token</label>
+                    <input type="password" id="plexToken" placeholder="X-Plex-Token..." class="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-orange-500 text-white mb-3">
+
+                    <label class="block text-sm text-gray-400 mb-1">Machine Identifier</label>
+                    <input type="text" id="plexMachineId" placeholder="Long alphanumeric string..." class="w-full bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-orange-500 text-white mb-4">
+
+                    <button onclick="saveConfig()" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-xl transition duration-200">Save Plex Settings</button>
+                </div>
+
                 <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700">
                     <h2 class="text-xl font-bold text-white mb-4">Festival Voice Controls</h2>
                     <div class="mb-4">
@@ -101,53 +130,34 @@
                 </div>
             </div>
 
-            <div class="lg:col-span-2 flex flex-col space-y-6 overflow-hidden h-full">
+            <div class="lg:col-span-2 flex flex-col space-y-6 lg:overflow-hidden lg:h-full">
                 
-                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex flex-col flex-grow overflow-hidden">
+                <div class="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 h-80 shrink-0 flex flex-col">
                     <div class="flex justify-between items-center mb-4 shrink-0">
-                        <h2 class="text-xl font-bold text-white">Text Simulator (Quiet Room)</h2>
-                        <div class="space-x-2">
-                            <button id="btnCall" onclick="startSimCall()" class="bg-green-600 hover:bg-green-500 text-white font-bold py-1 px-4 rounded-lg text-sm transition duration-200">📞 Call</button>
-                            <button id="btnHangup" onclick="endSimCall()" class="bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-4 rounded-lg text-sm transition duration-200 hidden">🛑 Hang Up</button>
-                        </div>
-                    </div>
-                    
-                    <div id="chatBox" class="flex-grow bg-gray-900 rounded-xl border border-gray-600 p-4 mb-4 overflow-y-auto space-y-3 custom-scrollbar">
-                        <div class="text-center text-gray-500 text-xs mt-10">Click "Call" to open a connection.</div>
-                    </div>
-                    
-                    <div class="flex space-x-3 shrink-0">
-                        <input type="text" id="simInput" placeholder="Enter text to simulate speech..." class="flex-grow bg-gray-900 border border-gray-600 rounded-xl p-3 text-sm focus:outline-none focus:border-blue-500 text-white disabled:opacity-50" disabled onkeypress="if(event.key === 'Enter') sendSimMessage()">
-                        <button id="btnSend" onclick="sendSimMessage()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-xl transition duration-200 disabled:opacity-50" disabled>Send</button>
-                    </div>
-                </div>
-
-                <div class="bg-gray-800 p-4 rounded-2xl shadow-lg border border-gray-700 h-48 shrink-0 flex flex-col">
-                    <div class="flex justify-between items-center mb-2 shrink-0">
-                        <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Recent Call History</h2>
+                        <h2 class="text-lg font-bold text-gray-400 uppercase tracking-wider">Recent Call History</h2>
                     </div>
                     <div class="flex-grow overflow-y-auto custom-scrollbar">
                         <table class="w-full text-left text-sm text-gray-400 relative">
                             <thead class="text-xs text-gray-500 bg-gray-900 sticky top-0 shadow">
                                 <tr>
-                                    <th class="px-3 py-2 rounded-tl-lg">Date & Time</th>
-                                    <th class="px-3 py-2">Caller ID</th>
-                                    <th class="px-3 py-2 rounded-tr-lg">Duration</th>
+                                    <th class="px-4 py-3 rounded-tl-lg">Date & Time</th>
+                                    <th class="px-4 py-3">Caller ID</th>
+                                    <th class="px-4 py-3 rounded-tr-lg">Duration</th>
                                 </tr>
                             </thead>
                             <tbody id="callHistoryTable" class="divide-y divide-gray-700">
-                                <tr><td colspan="3" class="px-3 py-4 text-center text-gray-600 animate-pulse">Loading data...</td></tr>
+                                <tr><td colspan="3" class="px-4 py-6 text-center text-gray-600 animate-pulse">Loading data...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <div class="bg-black p-4 rounded-2xl shadow-lg border border-gray-700 h-48 shrink-0 flex flex-col">
-                    <div class="flex justify-between items-center mb-2 shrink-0">
-                        <h2 class="text-sm font-bold text-gray-500 uppercase tracking-wider">Live Node Output</h2>
-                        <div class="w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                <div class="bg-black p-6 rounded-2xl shadow-lg border border-gray-700 flex-grow flex flex-col min-h-[400px]">
+                    <div class="flex justify-between items-center mb-4 shrink-0">
+                        <h2 class="text-lg font-bold text-gray-400 uppercase tracking-wider">Live Node Output</h2>
+                        <div class="w-3 h-3 bg-green-500 rounded-full animate-ping"></div>
                     </div>
-                    <div id="logBox" class="flex-grow overflow-y-auto font-mono text-xs text-green-400 space-y-1 custom-scrollbar">
+                    <div id="logBox" class="flex-grow overflow-y-auto font-mono text-sm text-green-400 whitespace-pre-wrap custom-scrollbar p-4 bg-gray-900 rounded-xl border border-gray-800">
                     </div>
                 </div>
             </div>
@@ -166,6 +176,7 @@
             .then(res => res.json())
             .then(data => {
                 document.getElementById('systemPrompt').value = data.system_prompt || "";
+                document.getElementById('defaultGreeting').value = data.default_greeting || "";
                 document.getElementById('voiceSpeed').value = data.voice_speed || 1.0;
                 document.getElementById('speedVal').innerText = data.voice_speed || 1.0;
                 document.getElementById('voicePitch').value = data.voice_pitch || 100;
@@ -177,16 +188,63 @@
                 document.getElementById('sipUser').value = data.sip_username || "";
                 document.getElementById('sipPass').value = data.sip_password || "";
                 document.getElementById('myIp').value = data.my_ip || "";
+                
+                // Load Plex Data
+                document.getElementById('plexIp').value = data.plex_ip || "";
+                document.getElementById('plexToken').value = data.plex_token || "";
+                document.getElementById('plexMachineId').value = data.plex_machine_id || "";
+
                 if (data.gpt_model) document.getElementById('gptModel').value = data.gpt_model;
                 if (data.max_tokens) {
                     document.getElementById('maxTokens').value = data.max_tokens;
                     document.getElementById('tokenVal').innerText = data.max_tokens;
                 }
+
+                // Hydrate Caller Profiles & Personal Address Books
+                if (data.caller_overrides && Object.keys(data.caller_overrides).length > 0) {
+                    for (const [cid, details] of Object.entries(data.caller_overrides)) {
+                        let abStr = "";
+                        if (details.address_book) {
+                            for (const [n, num] of Object.entries(details.address_book)) {
+                                abStr += `${n}: ${num}\n`;
+                            }
+                        }
+                        addCallerCard(cid, details.name, details.greeting, details.prompt, details.allow_ha, details.target_tv, abStr.trim());
+                    }
+                } else {
+                    addCallerCard('101', 'Lily', 'Hello Lily!', 'You are talking to a child.', true, 'media_player.shield_tv', 'Grandma: 15551234567\nDad: 15559876543');
+                }
             });
+
+        function addCallerCard(cid = '', name = '', greeting = '', prompt = '', allow_ha = false, target_tv = '', address_book_str = '') {
+            const container = document.getElementById('callerOverridesContainer');
+            const card = document.createElement('div');
+            card.className = 'caller-card bg-gray-900 border border-gray-600 rounded-xl p-3 relative';
+            card.innerHTML = `
+                <button type="button" class="absolute top-2 right-2 text-gray-500 hover:text-red-500 font-bold text-sm" onclick="this.closest('.caller-card').remove()">✕</button>
+                <div class="flex space-x-2 mb-2 pr-6">
+                    <input type="text" class="cid-input w-1/3 bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-white focus:border-purple-500 focus:outline-none" placeholder="Ext (e.g. 101)" value="${cid}">
+                    <input type="text" class="name-input w-2/3 bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-white focus:border-purple-500 focus:outline-none" placeholder="Nickname (e.g. Lily)" value="${name}">
+                </div>
+                <input type="text" class="greeting-input w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-white mb-2 focus:border-purple-500 focus:outline-none" placeholder="Custom Greeting..." value="${greeting}">
+                <textarea class="prompt-input w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-white h-16 mb-2 focus:border-purple-500 focus:outline-none custom-scrollbar" placeholder="Custom AI Personality Prompt...">${prompt}</textarea>
+                
+                <input type="text" class="tv-input w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-white mb-2 focus:border-purple-500 focus:outline-none" placeholder="Target TV Entity ID (e.g. media_player.tv)" value="${target_tv || ''}">
+
+                <textarea class="address-book-input w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-white h-20 focus:border-purple-500 focus:outline-none custom-scrollbar" placeholder="Address Book (Format -> Name: 15551234567)&#10;One contact per line...">${address_book_str}</textarea>
+
+                <div class="flex items-center mt-3 mb-1">
+                    <input type="checkbox" class="ha-control-input w-4 h-4 text-purple-600 bg-gray-800 border-gray-600 rounded focus:ring-purple-500 focus:ring-2" ${allow_ha ? 'checked' : ''}>
+                    <label class="ml-2 text-sm font-medium text-gray-300">Allow Advanced Tools (Plex, Calling)</label>
+                </div>
+            `;
+            container.appendChild(card);
+        }
 
         function saveConfig() {
             const data = {
                 system_prompt: document.getElementById('systemPrompt').value,
+                default_greeting: document.getElementById('defaultGreeting').value,
                 voice_speed: parseFloat(document.getElementById('voiceSpeed').value),
                 voice_pitch: parseInt(document.getElementById('voicePitch').value),
                 weather_zip: document.getElementById('weatherZip').value,
@@ -197,98 +255,82 @@
                 sip_server: document.getElementById('sipServer').value,
                 sip_username: document.getElementById('sipUser').value,
                 sip_password: document.getElementById('sipPass').value,
-                my_ip: document.getElementById('myIp').value
+                my_ip: document.getElementById('myIp').value,
+                plex_ip: document.getElementById('plexIp').value,
+                plex_token: document.getElementById('plexToken').value,
+                plex_machine_id: document.getElementById('plexMachineId').value,
+                caller_overrides: {}
             };
             
+            document.querySelectorAll('.caller-card').forEach(card => {
+                const ext = card.querySelector('.cid-input').value.trim();
+                if (ext) {
+                    const abData = {};
+                    const abLines = card.querySelector('.address-book-input').value.split('\n');
+                    abLines.forEach(line => {
+                        const parts = line.split(':');
+                        if (parts.length >= 2) {
+                            abData[parts[0].trim()] = parts[1].trim();
+                        }
+                    });
+
+                    data.caller_overrides[ext] = {
+                        name: card.querySelector('.name-input').value.trim(),
+                        greeting: card.querySelector('.greeting-input').value.trim(),
+                        prompt: card.querySelector('.prompt-input').value.trim(),
+                        target_tv: card.querySelector('.tv-input').value.trim(),
+                        allow_ha: card.querySelector('.ha-control-input').checked,
+                        address_book: abData
+                    };
+                }
+            });
+
             fetch('/api/config', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
-            }).then(() => alert('Configuration Saved. SIP updates require container restart.'));
+            }).then(() => alert('Configuration Saved. Settings update instantly!'));
         }
 
-        // --- SIMULATOR LOGIC ---
-        let simHistory = []; 
-        function startSimCall() {
-            simHistory = []; 
-            document.getElementById('btnCall').classList.add('hidden');
-            document.getElementById('btnHangup').classList.remove('hidden');
-            document.getElementById('simInput').disabled = false;
-            document.getElementById('btnSend').disabled = false;
-            const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML = `<div class="text-center text-green-500 text-xs my-2">--- Connection Established ---</div>`;
-            chatBox.innerHTML += `<div class="text-left"><span class="bg-gray-700 text-gray-200 px-4 py-2 rounded-lg inline-block border border-gray-600">[Simulated Audio: greeting_u8.wav]</span></div>`;
-            document.getElementById('simInput').focus();
-        }
-        function endSimCall() {
-            simHistory = []; 
-            document.getElementById('btnCall').classList.remove('hidden');
-            document.getElementById('btnHangup').classList.add('hidden');
-            document.getElementById('simInput').disabled = true;
-            document.getElementById('btnSend').disabled = true;
-            document.getElementById('simInput').value = '';
-            const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML += `<div class="text-center text-red-500 text-xs my-2">--- Disconnected ---</div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-        function sendSimMessage() {
-            const input = document.getElementById('simInput');
-            const text = input.value.trim();
-            if(!text) return;
-            const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML += `<div class="text-right flex justify-end"><span class="bg-blue-600 text-white px-4 py-2 rounded-xl inline-block max-w-[80%] text-left">${text}</span></div>`;
-            input.value = ''; 
-            simHistory.push({"role": "user", "content": text});
-            const typingId = 'typing-' + Date.now();
-            chatBox.innerHTML += `<div id="${typingId}" class="text-left flex justify-start"><span class="bg-gray-700 text-gray-400 px-4 py-2 rounded-xl inline-block border border-gray-600 text-sm animate-pulse">Thinking...</span></div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
-            fetch('/api/simulate', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({history: simHistory})
-            })
-            .then(res => res.json())
-            .then(data => {
-                document.getElementById(typingId).remove();
-                simHistory.push({"role": "assistant", "content": data.reply});
-                chatBox.innerHTML += `<div class="text-left flex justify-start"><span class="bg-gray-700 text-gray-200 px-4 py-2 rounded-xl inline-block border border-gray-600 max-w-[80%]">${data.reply}</span></div>`;
-                chatBox.scrollTop = chatBox.scrollHeight;
-            })
-            .catch(err => {
-                document.getElementById(typingId).remove();
-                chatBox.innerHTML += `<div class="text-center text-red-500 text-xs my-2">Error connecting to simulation server.</div>`;
-            });
-        }
-
-        // --- CALL HISTORY LOGGER ---
         function fetchCallHistory() {
             fetch('/api/call_history')
                 .then(res => res.json())
                 .then(data => {
                     const tbody = document.getElementById('callHistoryTable');
                     if (data.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-600">No calls recorded yet.</td></tr>`;
+                        tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-6 text-center text-gray-600">No calls recorded yet.</td></tr>`;
                         return;
                     }
                     tbody.innerHTML = data.map(call => `
                         <tr class="hover:bg-gray-750 transition duration-150">
-                            <td class="px-3 py-2 whitespace-nowrap text-gray-300">${call['Date & Time'] || 'Unknown'}</td>
-                            <td class="px-3 py-2 text-white font-medium">${call['Caller ID'] || 'Unknown'}</td>
-                            <td class="px-3 py-2 text-blue-400 font-mono">${call['Duration (Seconds)'] || '0'}s</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-gray-300">${call['time'] || call['Date & Time'] || 'Unknown'}</td>
+                            <td class="px-4 py-3 text-white font-medium">${call['caller'] || call['Caller ID'] || 'Unknown'}</td>
+                            <td class="px-4 py-3 text-blue-400 font-mono">${call['duration'] || call['Duration (Seconds)'] || '0'}s</td>
                         </tr>
                     `).join('');
                 });
         }
-        fetchCallHistory();
-        setInterval(fetchCallHistory, 5000);
 
-        // --- LIVE LOG STREAMING ---
-        const evtSource = new EventSource("/stream_logs");
-        const logBox = document.getElementById("logBox");
-        evtSource.onmessage = function(event) {
-            logBox.innerHTML += `<div class="whitespace-pre-wrap">${event.data}</div>`;
-            logBox.scrollTop = logBox.scrollHeight;
-        };
+        function fetchLiveLogs() {
+            fetch('/stream_logs')
+                .then(res => res.json())
+                .then(data => {
+                    const logBox = document.getElementById("logBox");
+                    const isAtBottom = logBox.scrollHeight - logBox.scrollTop <= logBox.clientHeight + 50;
+                    logBox.textContent = data.logs;
+                    if (isAtBottom) {
+                        logBox.scrollTop = logBox.scrollHeight;
+                    }
+                });
+        }
+
+        setInterval(() => {
+            fetchCallHistory();
+            fetchLiveLogs();
+        }, 3000);
+        
+        fetchCallHistory();
+        fetchLiveLogs();
     </script>
 </body>
 </html>

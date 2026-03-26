@@ -1,13 +1,17 @@
-from flask import Flask, render_template, render_template_string, request, jsonify, Response, session, redirect, url_for
+from flask import Flask, render_template, render_template_string, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 import threading
 import json
 import time
 import os
 import csv
+import logging
 from rotaryrobot_voip import start_robot, query_gpt4o
 
-# Ensure the data directory exists before we do anything
+# Mute Flask's built-in terminal spam so we only see Robot logs
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
 os.makedirs("data", exist_ok=True)
 
 app = Flask(__name__)
@@ -52,7 +56,6 @@ AUTH_HTML = """
 </html>
 """
 
-# --- UTILITIES ---
 def load_config():
     if not os.path.exists(CONFIG_FILE): return {}
     with open(CONFIG_FILE, 'r') as f:
@@ -66,7 +69,6 @@ def is_setup_complete():
     config = load_config()
     return "admin_user" in config and "admin_pass_hash" in config
 
-# --- AUTHENTICATION ROUTES ---
 @app.before_request
 def require_login():
     allowed_routes = ['login', 'setup', 'static']
@@ -106,7 +108,6 @@ def logout():
     session.pop('logged_in', None)
     return redirect(url_for('login'))
 
-# --- CORE ROUTES ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -133,7 +134,7 @@ def call_history():
                 reader = csv.DictReader(f)
                 for row in reader: history.append(row)
         except Exception: pass
-    return jsonify(history[::-1])
+    return jsonify(history[::-1][:15]) # Return only the 15 most recent to save memory
 
 @app.route('/api/simulate', methods=['POST'])
 def simulate():
@@ -145,19 +146,18 @@ def simulate():
     reply, _ = query_gpt4o(messages)
     return jsonify({"reply": reply})
 
-@app.route('/stream_logs')
+@app.route('/stream_logs', methods=['GET'])
 def stream_logs():
-    def generate():
-        if not os.path.exists(LOG_FILE): open(LOG_FILE, 'w').close()
+    # Robust JSON polling instead of glitchy SSE
+    if not os.path.exists(LOG_FILE):
+        return jsonify({"logs": "Waiting for robot initialization...\n"})
+    try:
         with open(LOG_FILE, "r") as f:
-            f.seek(0, 2)
-            while True:
-                line = f.readline()
-                if not line:
-                    time.sleep(0.1)
-                    continue
-                yield f"data: {line}\n\n"
-    return Response(generate(), mimetype='text/event-stream')
+            lines = f.readlines()
+            # Send the last 40 lines to keep the box clean
+            return jsonify({"logs": "".join(lines[-40:])})
+    except Exception as e:
+        return jsonify({"logs": f"Error reading logs: {e}\n"})
 
 if __name__ == '__main__':
     print("Starting VoIP Background Thread...")

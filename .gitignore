@@ -3,3 +3,6 @@ data/
 !greeting_u8.wav
 __pycache__/
 venv/
+data/
+__pycache__/
+venv/
