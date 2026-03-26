@@ -580,11 +580,18 @@ def answer_call(call):
             nickname = override.get("name", caller_id)
             robot_print(f"[Rotary Robot] Recognized caller: {nickname} ({caller_id})")
 
+        # Fetch the contacts specifically for this caller to feed to the AI prompt
+        address_book = {}
+        if caller_id in caller_overrides:
+            address_book = caller_overrides[caller_id].get("address_book", {})
+        contact_names = ", ".join(address_book.keys()) if address_book else "No contacts saved."
+
         current_time_str = datetime.now().strftime("%I:%M %p on %A, %B %d, %Y")
         local_weather_str = get_current_weather()
         
         if allow_ha:
-            tool_instruction = " If asked to play a show, you MUST use the play_plex_media tool. Do not just say you will do it. If asked to call or transfer to a person, use the transfer_call tool."
+            # We give the AI the Answer Key and tell it to be aggressive about phonetic mistakes
+            tool_instruction = f" The user's address book contains these names: {contact_names}. STT often makes phonetic mistakes (e.g. hearing 'dead' instead of 'Dad', or 'Carl Apples' instead of 'Call Office'). If the user says a name on this list, or something phonetically similar, you MUST assume they want to call them and IMMEDIATELY use the transfer_call tool. Do not ask for clarification. If asked to play a show, use the play_plex_media tool."
             full_system_identity = f"{system_prompt}{tool_instruction} Current Local Time: {current_time_str}. Current Local Weather: {local_weather_str}."
         else:
             full_system_identity = f"{system_prompt} Current Local Time: {current_time_str}. Current Local Weather: {local_weather_str}."
