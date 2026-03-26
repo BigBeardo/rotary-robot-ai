@@ -2,7 +2,7 @@
 
 **I made this for my 3 year old daughter. She can pick up her rotary phone handset, ask for a Bluey episode, or to talk to grandma. Robot makes it happen!**
 
-Rotary Robot breathes absurd, futuristic life into standard SIP/analog telephones. It transforms any connected phone into a multi-room, AI-powered smart home hub. Pick up the handset, wait for the AI to greet you, and simply ask it to play a movie, check the weather, or transfer your call to Grandma. 
+Rotary Robot breathes absurd, retro-futuristic life into standard SIP/analog telephones. It transforms any connected phone into a multi-room, AI-powered smart home hub. Pick up the handset, wait for Rotary Robot to greet you in his awesome 1980s computer voice, and simply ask him to play a movie, check the weather, or transfer your call to Grandma. 
 
 No coding required. Everything is managed through a beautiful, live Web GUI.
 
