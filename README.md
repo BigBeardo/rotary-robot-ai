@@ -1,60 +1,90 @@
-Markdown
-# ☎️🤖 Rotary Robot AI
+# ☎️ Rotary Robot
 
-**A lightning-fast, Dockerized bridge connecting vintage pulse-dial telephones to modern AI (GPT-4o) using SIP, FreePBX, and local machine learning.**
+**I made this for my 3 year old daughter. She can pick up her 1940s Western Electric 300 series handset & play Bluey on the 1957 Zenith Console next to the phone, or say "I want to talk to grandma" and the phone will dial the number for her!**
 
-Have you ever wanted to pick up a heavy, mechanical 1970s rotary phone, dial an extension, and have a natural, low-latency conversation with an AI? That is exactly what this project does. 
+Rotary Robot breathes absurd, futuristic life into standard SIP/analog telephones. It transforms any connected phone into a multi-room, AI-powered smart home hub. Pick up the handset, wait for the AI to greet you, and simply ask it to play a movie, check the weather, or transfer your call to Grandma. 
 
-Rotary Robot AI acts as a SIP client on your local network. When you dial its extension, it answers the phone, records your voice, locally transcribes it using an offline neural engine, streams a response from OpenAI, and speaks it back to you over the telephone line in real-time.
+No coding required. Everything is managed through a beautiful, live Web GUI.
 
-## ✨ Key Features
-* **100% In-Memory Pipeline:** Audio from the handset is piped directly into RAM as a raw byte array for `faster-whisper` to decode. Zero hard drive I/O bottlenecks.
-* **Fluid Background Thinking:** While the LLM generates its response, the robot instantly plays a randomized filler phrase (e.g., *"Accessing mainframe..."*). By the time the phrase finishes, the LLM has generated the complete response, resulting in a perfectly fluid, unbroken paragraph of speech.
-* **"Smart Flush" Acoustics:** The system actively purges stale SIP network audio to prevent "time-traveling" echoes, ensuring the robot hears you instantly the moment it finishes speaking.
-* **Typo-Proof Killswitches:** Gracefully handles analog disconnects and gracefully signs off when you say "Goodbye" or "Hang up."
-* **Vintage Voice:** Uses the classic `Festival` TTS engine to keep the robot sounding like a true retro machine, rather than a modern podcaster.
+---
 
-## 🛠️ Hardware & Network Requirements
-1. **A Vintage Telephone:** Any standard analog phone (rotary or touch-tone).
-2. **An Analog Telephone Adapter (ATA):** * *CRITICAL NOTE for Rotary Phones:* Most modern ATAs do not understand mechanical pulse dialing. You **must** use an ATA that supports it, such as the **Grandstream HT802** or **HT812**, which have a specific "Pulse Dialing Standard" setting in their firmware. (Alternatively, you can use a pulse-to-tone converter like a Dialgizmo with any ATA).
-3. **A SIP Server:** A local PBX server like **FreePBX** or Asterisk to route the extension to the Docker container.
-4. **A Linux Host:** Any x86_64 Linux machine to run the Docker container. 
+## ✨ Features
 
-## 🚀 Quick Start Guide
+* **🎛️ The Web Dashboard:** A sleek, fully dynamic web interface to manage API keys, monitor live system logs, and view call history—all without ever touching a configuration file.
+* **👨‍👩‍👧‍👦 Multi-Tenant Caller Profiles:** Rotary Robot knows which room is calling! Map specific Caller IDs (extensions) to custom greetings, unique personalities, and specific Target TVs. 
+* **🍿 Direct Plex Injection:** Tell the robot what you want to watch. It searches your local Plex server, grabs the deep link, and uses Home Assistant to instantly fling the movie to the TV in the room you are calling from.
+* **📞 Voice Dialing (Analog Hacking):** Say "Call Dad," and the robot mathematically synthesizes raw DTMF audio tones (`##Ext`) to securely blind-transfer your call through your PBX. 
+* **🧠 Conversational AI Brain:** Powered by OpenAI, the robot acts as the ultimate retro-futuristic operator, seamlessly routing your requests with fluid, natural conversation.
 
-### 1. Clone the Repository
-```bash
-git clone [https://github.com/YourUsername/rotary-robot-ai.git](https://github.com/YourUsername/rotary-robot-ai.git)
-cd rotary-robot-ai
-2. Build and Launch the Container
-Bash
-docker compose up -d --build
-Note: The initial build will take a few minutes as it downloads the PyTorch and Whisper machine learning libraries. Docker will automatically generate a secure data/ folder on your host to store your persistent configurations and call logs.
+---
 
-3. System Initialization
-Once the container is running, open your web browser and navigate to:
-http://<YOUR_SERVER_IP>:5000
+## 🛠️ Prerequisites
 
-You will be greeted by the System Initialization screen. Create a secure local Admin username and password.
+Before you spin up the container, you will need a few things running on your local network:
+1. A SIP PBX (FreePBX, Asterisk, etc.) to handle the phone calls.
+2. Home Assistant (with the Android TV integration enabled).
+3. Plex Media Server.
+4. An OpenAI API Key.
+5. An OpenWeatherMap API Key (Optional, but fun).
+6. You'll also need an ATA adapter, if you are using a rotary phone I recommend a Grandstream HT802 or HT812
 
-Log in and navigate to the Credentials & Interfacing panel.
+---
 
-Input your OpenAI API Key, your OpenWeatherMap API Key, your local FreePBX SIP credentials, and your container's IP address.
+## 🚀 Quick Start / GUI Setup
 
-Click Securely Save Credentials.
+1. Clone this repository and spin up the Docker container (see `docker-compose.yml`).
+2. Open your web browser and navigate to the Rotary Robot Dashboard (e.g., `http://<your-docker-ip>:5000`).
+3. Enter your OpenAI, OpenWeatherMap, Plex, and Home Assistant credentials into the **Credentials & Interfacing** box.
+4. Click **Save Configuration**.
+5. **Restart the Docker Container** (SIP credential changes require a hard reboot to register with your PBX).
 
-Restart the container (docker restart rotaryrobot) to apply the new SIP network settings.
+---
 
-🧠 How it Works (The Pipeline)
-The Call: You pick up the handset and dial the robot's extension. The Grandstream ATA converts the analog voltage into a digital SIP request and sends it to FreePBX. FreePBX routes the call to the Python pyVoIP client running inside Docker.
+## 📖 Step-by-Step Integrations
 
-VAD (Voice Activity Detection): A dynamic, multi-threaded background loop listens to the RTP audio stream, waiting for a brief moment of silence to know you have finished speaking.
+### 1. FreePBX Setup (The Secret Sauce)
+For Rotary Robot to answer calls and successfully transfer them using Voice Dialing, your PBX needs to be configured correctly.
 
-Local Transcription: The audio is instantly processed locally by faster-whisper, converting your speech to text in less than a second.
+1. Log into your FreePBX Administration GUI.
+2. Go to **Applications -> Extensions** and create a new `pjsip` extension for the Robot (e.g., `Ext 300`).
+3. Set a secure password.
+4. **CRITICAL STEP:** Go to the **Advanced** tab for this extension. Find **DTMF Signaling** (or DTMF Mode) and change it from `RFC2833` to **`Inband`** (or `Auto`). *If you skip this, FreePBX will be completely deaf to the Robot's voice-dialing transfer beeps!*
+5. Submit and click **Apply Config**. 
 
-The Brain: The text is sent to the OpenAI API (GPT-4o or GPT-4o-mini).
+### 2. Home Assistant & Target TVs
+The robot uses Android Debug Bridge (ADB) via Home Assistant to instantly wake up your TV and force-launch Plex deep links. 
 
-The Mouth: As the AI generates its response, the Python script intercepts it at every comma or period, feeding those short chunks into the Festival TTS engine. This eliminates the "Wait to Speak" problem, delivering audio to your ear almost instantly.
+1. In Home Assistant, go to **Settings -> Devices & Services**.
+2. Add the **Android TV / Fire TV** integration.
+3. Enter the IP address of your Fire TV or Nvidia Shield (Make sure ADB Debugging is enabled in the TV's developer settings!).
+4. Once added, find the TV in your Home Assistant entities list and copy its exact Entity ID (e.g., `media_player.living_room_shield`).
+5. Paste this Entity ID into the **Target TV Entity ID** box on the Rotary Robot Web Dashboard.
 
-📝 License
-This project is open-source and available for any homelab tinkerer to modify, break, and rebuild.
+### 3. Multi-Room Profiles & Voice Dialing
+Have a phone in the kitchen and a phone in the kid's room? You can set up custom profiles so the robot behaves differently depending on who picks up.
+
+1. On the Web Dashboard, click **+ Add Caller Profile**.
+2. Enter the **Extension** of the phone (e.g., `101`).
+3. Assign it a specific **Target TV Entity ID** (e.g., `media_player.kids_room_tv`). When this phone asks for a movie, it bypasses the global settings and sends it straight to this screen.
+4. **Build the Address Book:** In the address book text box, map out names to extensions for the Voice Dialing feature. 
+    * *Format:* `Name: Extension` (e.g., `Grandma: 201`, `Dad: 15551234567`).
+5. Check **Allow Advanced Tools** and hit **Save**!
+
+### 4. Connecting the Brain (OpenAI)
+To make the system fast and conversational, we use OpenAI's API. 
+
+1. Log into `platform.openai.com` and generate an API Key.
+2. Paste it into the Dashboard.
+3. Select **GPT-4o Mini** from the dropdown. It is insanely fast, incredibly cheap, and perfectly suited for smart home routing tasks. 
+
+---
+
+## 🗣️ How to use it
+* Pick up the phone. 
+* Hear the dial tone? Good. Dial the Robot's extension.
+* Wait for the greeting. 
+* **"Hey, can you put on The Goonies?"** -> *Robot searches Plex, wakes up the TV assigned to your caller ID, and deep-links the movie.*
+* **"Actually, can you just call Grandma?"** -> *Robot looks up Grandma in your personal address book, blasts DTMF tones down the line, and blind-transfers you through the PBX.*
+
+---
+*Disclaimer: Rotary Robot is not responsible for your family members accidentally launching horror movies on the kitchen TV, or the sheer terror of hearing a 1980s telephone cheerfully emulate dial tones in the middle of the night.*
